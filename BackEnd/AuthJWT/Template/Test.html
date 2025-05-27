@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Template</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            padding: 10px 0;
+            background: #007BFF;
+            color: #fff;
+            border-radius: 8px 8px 0 0;
+        }
+        .content {
+            padding: 20px;
+        }
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-top: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 20px 0;
+            background: #007BFF;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>Welcome to Our Service</h1>
+        </div>
+        <div class="content">
+            <p>Hi [Recipient's Name],</p>
+            <p>Thank you for signing up for our service. We're excited to have you on board!</p>
+            <p>Please click the button below to verify your email address:</p>
+            <a href="[Verification Link]" class="button">Verify Email</a>
+            <p>If you did not sign up for this account, please ignore this email.</p>
+            <p>Best regards,</p>
+            <p>The [Your Company Name] Team</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2023 [Your Company Name]. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

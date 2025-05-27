@@ -1,0 +1,21 @@
+todo
+- tao khach san 
+- dang ki len khach san
+- search phong
+- dat phong 
+- them anh 
+- thanh toan 
+- AI 
+- chi tiet phong
+- review
+- thong ke 
+- cho hotel owner xem các request và các action 
+- hiển thị các phòng thuộc loại và chọn phòng 
+
+
+
+tao khach san toa phong 
+them anh them policy 
+them tien nghi
+
+
