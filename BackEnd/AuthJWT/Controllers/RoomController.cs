@@ -12,21 +12,19 @@ namespace AuthJWT.Controllers
     public class RoomController : ControllerBase
     {
         private readonly IRoomService _roomService;
-        private readonly IConvenienceService _convenienceService;
 
-        public RoomController(IRoomService roomService, IConvenienceService conveniceService)
+        public RoomController(IRoomService roomService)
         {
-            _convenienceService = conveniceService;
             _roomService = roomService;
         }
 
         [HttpGet]
         [Authorize(Roles = "HotelOwner,Admin,User")]
-        public async Task<IActionResult> GetAllRooms(Guid hotelId, int pageIndex = 1, int pageSize = 10, string? search = null)
+        public async Task<IActionResult> GetAllRooms(Guid hotelId, int capacity,int pageIndex = 1, int pageSize = 10, string? search = null,DateTime? checkInDate = null, DateTime? checkOutDate = null)
         {
             return await HandleRequestHelper.HandleRequestAsync(async () =>
             {
-                var rooms = await _roomService.GetRoomsByHotelIdAsync(hotelId, pageIndex, pageSize, search);
+                var rooms = await _roomService.GetRoomsByHotelIdAsync(hotelId, capacity, pageIndex, pageSize, search, checkInDate, checkOutDate);
                 return Ok(ApiResponse<PaginateList<RoomDto>>.Success(rooms));
             });
         }
@@ -65,7 +63,7 @@ namespace AuthJWT.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "HotelOwner")]
-        public async Task<IActionResult> UpdateRoom(Guid id, [FromBody] RoomUpdateDto roomDto)
+        public async Task<IActionResult> UpdateRoom([FromForm] RoomUpdateDto roomDto,[FromForm] List<IFormFile>? files, Guid id)
         {
             return await HandleRequestHelper.HandleRequestAsync(async () =>
             {
@@ -74,7 +72,7 @@ namespace AuthJWT.Controllers
                     return BadRequest(ApiResponse<string>.Failure("Room ID mismatch"));
                 }
 
-                var updatedRoom = await _roomService.UpdateRoomAsync(roomDto);
+                var updatedRoom = await _roomService.UpdateRoomAsync(roomDto, files);
                 if (updatedRoom == null)
                 {
                     return NotFound(ApiResponse<string>.Failure("Room not found"));

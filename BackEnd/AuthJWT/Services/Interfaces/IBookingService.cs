@@ -9,5 +9,6 @@ namespace AuthJWT.Services.Interfaces
         Task<IEnumerable<BookingResponse>> GetBookingsByUserIdAsync(string userId, string? status);
         Task UpdatStatusBookingAsync(Guid bookingId,string status,string? cancellationReason);
         Task UpdateBookignAsync(Guid bookindId, BookingCreateDto bookingDtos);
+        Task<bool> VerifyBookingAsync(Guid bookingId, string userId);
     }
 }

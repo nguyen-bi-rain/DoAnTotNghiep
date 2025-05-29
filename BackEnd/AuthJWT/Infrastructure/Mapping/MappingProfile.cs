@@ -27,7 +27,15 @@ namespace AuthJWT.Infrastructure.Mapping
 
             CreateMap<Location, LocationDto>().ReverseMap();
 
-            CreateMap<Room, RoomDto>().ReverseMap();
+            CreateMap<Room, RoomDto>()
+                .ForMember(dest => dest.RoomImages, opt => opt.MapFrom(src => src.RoomImages))
+                .ForMember(dest => dest.Conveniences, opt => opt.MapFrom(src => src.Conveniences.Select(c => new ConvenienceDto
+                {
+                    Id = c.ConvenienceId,
+                    Name = c.Convenience.Name
+                })))
+
+            .ReverseMap();
             CreateMap<Room, RoomCreateDto>().ReverseMap();
             CreateMap<Room, RoomUpdateDto>().ReverseMap();
             CreateMap<Room, RoomResponse>().ReverseMap();
@@ -38,6 +46,9 @@ namespace AuthJWT.Infrastructure.Mapping
                     Name = c.Convenience.Name
                 })))
                 .ReverseMap();
+
+            CreateMap<RoomConvenience, RoomConvenienceDto>().ReverseMap();
+            CreateMap<RoomConvenience, RoomConvenienceCreateDto>().ReverseMap();
             CreateMap<RoomImage, RoomImageDto>().ReverseMap();
             CreateMap<RoomImage, RoomImageCreateDto>().ReverseMap();
             CreateMap<RoomImage, RoomImageUpdateDto>().ReverseMap();
@@ -59,7 +70,7 @@ namespace AuthJWT.Infrastructure.Mapping
             CreateMap<BookingRoom, BookingRoomResponse>()
                 .ForMember(dest => dest.Room, opt => opt.MapFrom(src => src.Room))
                 .ReverseMap();
-            
+
         }
     }
 }

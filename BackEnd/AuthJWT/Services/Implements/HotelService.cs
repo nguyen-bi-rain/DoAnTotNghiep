@@ -122,8 +122,6 @@ namespace AuthJWT.Services.Implements
                 .Include(x => x.Location)
                 .Include(x => x.HotelConveniences)
                 .ThenInclude(hc => hc.Convenience)
-                .Include(x => x.Rooms)
-                    .ThenInclude(r => r.RoomType)
                 .Include(x => x.Policies)
                 .FirstOrDefaultAsync(x => x.Id == id);
 
@@ -147,7 +145,6 @@ namespace AuthJWT.Services.Implements
             var hotelImages = await _hotelImageService.GetImageBytHoelId(id);
 
             // Get rooms as RoomHotelReponse DTOs
-            var rooms = await _roomService.GetAllRoomsByHotelIdAsync(id);
 
             // Get policies
             var policies = hotel.Policies != null ? hotel.Policies.ToList() : new List<Policy>();
@@ -169,7 +166,6 @@ namespace AuthJWT.Services.Implements
                     Description = c.Description
                 }).ToList(),
                 HotelImages = hotelImages.ToList(),
-                Rooms = rooms.ToList(),
                 Policy = _mapper.Map<List<PolicyDto>>(policies)
             };
 

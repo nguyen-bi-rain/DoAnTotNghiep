@@ -17,7 +17,7 @@ namespace AuthJWT.Domain.DTOs
         public int NumberOfRooms { get; set; }
         public int AvailableRooms { get; set; }
         public string BedType { get; set; }
-        public virtual ICollection<RoomConvenienceDto> Conveniences { get; set; } = new List<RoomConvenienceDto>();
+        public virtual ICollection<ConvenienceDto> Conveniences { get; set; } = new List<ConvenienceDto>();
         public virtual ICollection<RoomImageDto> RoomImages { get; set; } = new List<RoomImageDto>();
     }
     public class RoomResponse
@@ -107,7 +107,6 @@ namespace AuthJWT.Domain.DTOs
         public int NumberOfRooms { get; set; }
         [Required]
         public string BedType { get; set; }
-        public ICollection<RoomConvenienceCreateDto> Conveniences { get; set; }
-        public ICollection<RoomImageUpdateDto> RoomImagesUpdate { get; set; }
+        public ICollection<RoomConvenienceUpdateDto> Conveniences { get; set; }
     }
 }

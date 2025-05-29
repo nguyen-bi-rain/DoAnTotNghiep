@@ -106,13 +106,7 @@ namespace AuthJWT.Services.Implements
                                                     .Include(r => r.RoomImages)
                                                     .Include(r => r.Conveniences)
                                                     .AsQueryable();
-
-            if (rooms == null || !await rooms.AnyAsync())
-            {
-                throw new ResourceNotFoundException("No rooms found for this hotel.");
-            }
-            var models = await rooms.ToListAsync();
-            var roomDtos = _mapper.Map<IEnumerable<RoomDto>>(models);
+            var roomDtos = _mapper.Map<List<RoomDto>>(rooms.ToList());
 
             foreach (var roomDto in roomDtos)
             {
@@ -129,27 +123,98 @@ namespace AuthJWT.Services.Implements
 
         public async Task<RoomDto> GetRoomByIdAsync(Guid id)
         {
-            var room = await _unitOfWork.RoomRepository.GetByIdAsync(id);
-            return room == null ? throw new ResourceNotFoundException($"Room with Id : {id} not found") : _mapper.Map<RoomDto>(room);
-        }
-
-        public async Task<PaginateList<RoomDto>> GetRoomsByHotelIdAsync(Guid hotelId, int pageIndex = 1, int pageSize = 10, string? search = null)
-        {
-            var rooms = _unitOfWork.RoomRepository.GetQuery(r => r.HotelId == hotelId)
-                                                    .Include(r => r.RoomImages)
-                                                    .Include(r => r.Conveniences)
-                                                    .AsQueryable();
-            if (!string.IsNullOrEmpty(search))
+            var room = await _unitOfWork.RoomRepository.GetQuery()
+                                                        .Include(x => x.RoomImages)
+                                                        .Include(x => x.Conveniences)
+                                                        .ThenInclude(rc => rc.Convenience)
+                                                        .FirstOrDefaultAsync(r => r.Id == id);
+            if (room == null)
             {
-                rooms = rooms.Where(r => r.RoomName.Contains(search) || r.Description.Contains(search));
+                throw new ResourceNotFoundException($"Room with Id : {id} not found");
+            }
+            var roomDto = _mapper.Map<RoomDto>(room);
+
+            if (roomDto.RoomImages != null && roomDto.RoomImages.Any())
+            {
+                foreach (var image in roomDto.RoomImages)
+                {
+                    image.ImageUrl = await _s3Service.GetFileUrlAsync(image.ImageUrl.ToString());
+                }
             }
 
-            if (rooms == null || !await rooms.AnyAsync())
+            // Map conveniences with details from Convenience entity
+            if (roomDto.Conveniences != null && roomDto.Conveniences.Any())
+            {
+                foreach (var conv in roomDto.Conveniences)
+                {
+                    // Find the matching RoomConvenience in the model to get full Convenience info
+                    var roomConv = room.Conveniences.FirstOrDefault(c => c.ConvenienceId == conv.Id);
+                    if (roomConv != null && roomConv.Convenience != null)
+                    {
+                        conv.Name = roomConv.Convenience.Name;
+                        conv.Description = roomConv.Convenience.Description;
+                        conv.Type = roomConv.Convenience.Type;
+                    }
+                }
+            }
+
+            return roomDto;
+        }
+
+        public async Task<PaginateList<RoomDto>> GetRoomsByHotelIdAsync(Guid hotelId,int capacity, int pageIndex = 1, int pageSize = 10, string? search = null,DateTime? checkIn = null, DateTime? checkOut = null)
+        {
+            var roomsQuery = _unitOfWork.RoomRepository.GetQuery(r => r.HotelId == hotelId)
+                                                        .Include(r => r.RoomImages)
+                                                        .Include(r => r.Conveniences)
+                                                            .ThenInclude(rc => rc.Convenience)
+                                                        .Include(r => r.Bookings)
+                                                        .ThenInclude(b => b.Booking)
+                                                        .AsQueryable();
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                roomsQuery = roomsQuery.Where(r => r.RoomName.Contains(search) || r.Description.Contains(search));
+            }
+
+            // Filter by capacity
+            if (capacity > 0)
+            {
+                roomsQuery = roomsQuery.Where(r => r.Capacity >= capacity);
+            }
+
+            // Filter by availability in the given date range
+            if (checkIn.HasValue && checkOut.HasValue)
+            {
+                var ci = checkIn.Value.Date;
+                var co = checkOut.Value.Date;
+
+                roomsQuery = roomsQuery.Where(room =>
+                    // Room must have at least 1 available room
+                    room.AvailableRooms > 0 &&
+                    // Room is available if all bookings do not overlap with requested range
+                    !room.Bookings.Any(b =>
+                        // Only consider bookings that are not cancelled
+                        b.Booking.Status != "Cancelled" &&
+                        (
+                            (b.Booking.CheckInDate < co && b.Booking.CheckOutDate > ci)
+                        )
+                    )
+                );
+            }
+
+            var totalCount = await roomsQuery.CountAsync();
+            if (totalCount == 0)
             {
                 throw new ResourceNotFoundException("No rooms found for this hotel.");
             }
-            var models = await rooms.ToListAsync();
-            var roomDtos = _mapper.Map<IEnumerable<RoomDto>>(models);
+
+            var models = await roomsQuery
+                .OrderBy(r => r.RoomName)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            var roomDtos = _mapper.Map<List<RoomDto>>(models);
 
             foreach (var roomDto in roomDtos)
             {
@@ -160,8 +225,26 @@ namespace AuthJWT.Services.Implements
                         image.ImageUrl = await _s3Service.GetFileUrlAsync(image.ImageUrl.ToString());
                     }
                 }
+
+                // Map conveniences with details from Convenience entity
+                if (roomDto.Conveniences != null && roomDto.Conveniences.Any())
+                {
+                    foreach (var conv in roomDto.Conveniences)
+                    {
+                        // Find the matching RoomConvenience in the model to get full Convenience info
+                        var roomModel = models.FirstOrDefault(r => r.Id == roomDto.Id);
+                        var roomConv = roomModel?.Conveniences.FirstOrDefault(c => c.ConvenienceId == conv.Id);
+                        if (roomConv != null && roomConv.Convenience != null)
+                        {
+                            conv.Name = roomConv.Convenience.Name;
+                            conv.Description = roomConv.Convenience.Description;
+                            conv.Type = roomConv.Convenience.Type;
+                        }
+                    }
+                }
             }
-            var paging = PaginateList<RoomDto>.Create(roomDtos, pageIndex, pageSize);
+
+            var paging = new PaginateList<RoomDto>(roomDtos, totalCount, pageIndex, pageSize);
             return paging;
         }
 
@@ -178,80 +261,81 @@ namespace AuthJWT.Services.Implements
 
         public async Task<RoomUpdateDto> UpdateRoomAsync(RoomUpdateDto room, List<IFormFile>? files)
         {
-            using (var transaction = await _unitOfWork.BeginTransactionAsync())
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            var existingRoom = await _unitOfWork.RoomRepository.GetQuery()
+                                    .Include(x => x.Conveniences)
+                                    .Include(x => x.RoomImages)
+                                    .FirstOrDefaultAsync(r => r.Id == room.Id);
+            if (existingRoom == null)
             {
-                try
+                throw new ResourceNotFoundException($"Room with Id : {room.Id} not found");
+            }
+
+            existingRoom.RoomName = room.RoomName;
+            existingRoom.HotelId = room.HotelId;
+            existingRoom.RoomTypeId = room.RoomTypeId;
+            existingRoom.Status = room.Status;
+            existingRoom.ViewType = room.ViewType;
+            existingRoom.PricePerNight = room.PricePerNight;
+            existingRoom.Description = room.Description;
+            existingRoom.Capacity = room.Capacity;
+            existingRoom.NumberOfBeds = room.NumberOfBeds;
+            existingRoom.BedType = room.BedType;
+
+            if (room.NumberOfRooms > existingRoom.NumberOfRooms)
+            {
+                existingRoom.AvailableRooms += (room.NumberOfRooms - existingRoom.NumberOfRooms);
+            }
+            else if (room.NumberOfRooms < existingRoom.NumberOfRooms)
+            {
+                var diff = existingRoom.NumberOfRooms - room.NumberOfRooms;
+                existingRoom.AvailableRooms = Math.Max(0, existingRoom.AvailableRooms - diff);
+            }
+            existingRoom.NumberOfRooms = room.NumberOfRooms;
+
+            // Handle conveniences (add new and remove old)
+            var existingConvenienceIds = existingRoom.Conveniences.Select(c => c.ConvenienceId).ToList();
+            var newConvenienceIds = room.Conveniences?.Select(conv => conv.ConvenienceId).ToList() ?? new List<Guid>();
+
+            // Add new conveniences
+            var conveniencesToAdd = newConvenienceIds.Except(existingConvenienceIds).ToList();
+            foreach (var convenienceId in conveniencesToAdd)
+            {
+                var newConvenience = new RoomConvenienceCreateDto
                 {
-                    var existingRoom = await _unitOfWork.RoomRepository.GetQuery(r => r.Id == room.Id)
-                        .Include(r => r.Conveniences)
-                        .Include(r => r.RoomImages)
-                        .FirstOrDefaultAsync();
+                    RoomId = existingRoom.Id,
+                    ConvenienceId = convenienceId
+                };
+                await _roomConveniceService.AddRoomConveniceAsync(newConvenience);
+            }
 
-                    if (existingRoom == null)
-                    {
-                        throw new ResourceNotFoundException($"Room with Id : {room.Id} not found");
-                    }
-
-                    // Update main fields
-                    _mapper.Map(room, existingRoom);
-
-                    await UpdateRoomConveniencesAsync(existingRoom, room.Conveniences);
-                    await UpdateRoomImagesAsync(existingRoom, files);
-
-                    _unitOfWork.RoomRepository.Update(existingRoom);
-                    var res = await _unitOfWork.SaveChangesAsync();
-                    if (res <= 0)
-                    {
-                        throw new DatabaseBadRequestException("Failed to update room.");
-                    }
-
-                    await transaction.CommitAsync();
-
-                    return _mapper.Map<RoomUpdateDto>(existingRoom);
-                }
-                catch
+            // Remove old conveniences
+            var conveniencesToRemove = existingConvenienceIds.Except(newConvenienceIds).ToList();
+            foreach (var convenienceId in conveniencesToRemove)
+            {
+                var roomConvenience = existingRoom.Conveniences.FirstOrDefault(c => c.ConvenienceId == convenienceId);
+                if (roomConvenience != null)
                 {
-                    await transaction.RollbackAsync();
-                    throw;
+                    _unitOfWork.RoomConvenienceRepository.Delete(roomConvenience);
                 }
             }
-        }
 
-        private async Task UpdateRoomConveniencesAsync(Room existingRoom, List<RoomConvenienceDto>? conveniences)
-        {
-            if (conveniences != null && conveniences.Count > 0)
-            {
-                // Remove old conveniences
-                var oldConveniences = existingRoom.Conveniences.ToList();
-                foreach (var conv in oldConveniences)
-                {
-                    _unitOfWork.RoomConvenienceRepository.Delete(conv);
-                }
-                // Add new conveniences
-                foreach (var convDto in conveniences)
-                {
-                    var conv = _mapper.Map<RoomConvenience>(convDto);
-                    conv.RoomId = existingRoom.Id;
-                    await _unitOfWork.RoomConvenienceRepository.AddAsync(conv);
-                }
-            }
-        }
-
-        private async Task UpdateRoomImagesAsync(Room existingRoom, List<IFormFile>? files)
-        {
+            // Only add new images if provided
             if (files != null && files.Any())
             {
-                // Remove old images
-                if (existingRoom.RoomImages != null && existingRoom.RoomImages.Any())
-                {
-                    foreach (var image in existingRoom.RoomImages.ToList())
-                    {
-                        await _roomImageService.DeleteRoomImageAsync(image.Id);
-                    }
-                }
-                // Add new images
                 await _roomImageService.AddRoomImageAsync(existingRoom.Id, files);
             }
+
+            _unitOfWork.RoomRepository.Update(existingRoom);
+            var res = await _unitOfWork.SaveChangesAsync();
+            if (res <= 0)
+            {
+                await transaction.RollbackAsync();
+                throw new DatabaseBadRequestException("Failed to update room.");
+            }
+            await transaction.CommitAsync();
+            return room;
         }
+
     }
 }

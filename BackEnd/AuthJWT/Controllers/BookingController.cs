@@ -75,5 +75,19 @@ namespace AuthJWT.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+        [HttpGet("verify/{bookingId}")]
+        [Authorize(Roles = "User,HotelOwner,Admin")]
+        public async Task<IActionResult> VerifyBooking(Guid bookingId, string userId)
+        {
+            try
+            {
+                var isVerified = await _bookingService.VerifyBookingAsync(bookingId, userId);
+                return Ok(new { isVerified });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

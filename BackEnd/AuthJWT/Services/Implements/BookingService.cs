@@ -268,5 +268,12 @@ namespace AuthJWT.Services.Implements
             };
             await _sendEmailService.SendEmailAsync(email);
         }
+
+        public Task<bool> VerifyBookingAsync(Guid bookingId, string userId)
+        {
+            return _unitOfWork.BookingRepository.GetQuery(x => x.Id == bookingId && x.UserId == userId)
+                .AnyAsync();
+                
+        }
     }
 }

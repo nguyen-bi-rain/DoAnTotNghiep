@@ -34,7 +34,7 @@ namespace AuthJWT.Controllers
         }
 
         [HttpGet("{id}")]
-        [Authorize(Roles = "Admin,HotelOwner,User")]
+        // [Authorize(Roles = "Admin,HotelOwner,User")]
         public async Task<IActionResult> GetHotelById(Guid id)
         {
             return await HandleRequestHelper.HandleRequestAsync(async () =>

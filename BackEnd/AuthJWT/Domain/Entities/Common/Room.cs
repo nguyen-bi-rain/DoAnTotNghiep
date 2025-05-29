@@ -6,7 +6,7 @@ namespace AuthJWT.Domain.Entities.Common;
 public class Room : BaseEntity
 {
     [Required]
-    [StringLength(20)]
+    [StringLength(50)]
     public string RoomName { get; set; }
     [Required]
     [StringLength(20)]
