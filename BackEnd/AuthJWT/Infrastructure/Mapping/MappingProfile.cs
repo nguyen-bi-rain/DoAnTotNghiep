@@ -70,6 +70,8 @@ namespace AuthJWT.Infrastructure.Mapping
             CreateMap<BookingRoom, BookingRoomResponse>()
                 .ForMember(dest => dest.Room, opt => opt.MapFrom(src => src.Room))
                 .ReverseMap();
+            CreateMap<Invoice, InvoiceCreateDto>().ReverseMap();
+            CreateMap<Invoice, InvoiceDto>().ReverseMap();
 
         }
     }

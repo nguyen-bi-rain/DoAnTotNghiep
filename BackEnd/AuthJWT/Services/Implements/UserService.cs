@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using AuthJWT.Domain.Contracts;
@@ -63,21 +64,78 @@ namespace AuthJWT.Services.Implements
             }
         }
 
-        /// <summary>
-        /// /// Delete a user by id
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        /// <exception cref="Exception"></exception>
-        public async Task DeleteUserAsync(Guid id)
+        public async Task ChnageStatusAsync(Guid id, bool status)
         {
             var user = await _userManager.FindByIdAsync(id.ToString());
+            if (user == null)
+            {
+                throw new Exception("User not found");
+            }
+            user.isActive = status;
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                throw new Exception($"Failed to change user status: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+            }
+    
+        }
+
+
+        public async Task DeleteUserAsync(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
             if (user == null)
             {
                 _logger.LogInformation("User not found");
                 throw new Exception("User not found");
             }
-            await _userManager.DeleteAsync(user);
+            var result = await _userManager.DeleteAsync(user);
+            var avatar = user.Avatar;
+            if (avatar != null)
+            {
+                await _s3Service.DeleteFileAsync(avatar);
+            }
+            if (!result.Succeeded)
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                _logger.LogInformation("Failed to delete user: {errors}", errors);
+                throw new Exception($"Failed to delete user : {errors}");
+            }
+        }
+
+        public async Task<PaginateList<UserDto>> GetAllUsersAsync(int pageNumber, int pageSize, string? searchTerm = null)
+        {
+            var usersQuery = _userManager.Users.AsQueryable();
+            if (!string.IsNullOrEmpty(searchTerm))
+            {
+                usersQuery = usersQuery.Where(u => u.FirstName.Contains(searchTerm) || u.LastName.Contains(searchTerm) || u.Email.Contains(searchTerm));
+            }
+
+            var users = await usersQuery.ToListAsync();
+            var userDtos = new List<UserDto>();
+            foreach (var user in users)
+            {
+                if (user.Avatar != null)
+                {
+                    var fileUrl = await _s3Service.GetFileUrlAsync(user.Avatar);
+                    user.Avatar = fileUrl.ToString();
+                }
+                userDtos.Add(new UserDto
+                {
+                    Id = user.Id,
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
+                    DateOfBirth = user.DateOfBirth ?? DateTime.MinValue,
+                    PhoneNumber = user.PhoneNumber ?? string.Empty,
+                    Location = user.Location ?? string.Empty,
+                    Email = user.Email ?? string.Empty,
+                    Avatar = user.Avatar ?? string.Empty,
+                    IsActive = user.isActive,
+                    RoleName = (await _userManager.GetRolesAsync(user)).FirstOrDefault() ?? "User"
+                });
+
+            }
+            return PaginateList<UserDto>.Create(userDtos, pageNumber, pageSize);
         }
 
         public async Task<UserProfileResponse> GetByIdAsync(Guid id)
@@ -151,13 +209,11 @@ namespace AuthJWT.Services.Implements
 
         public async Task<CurrentUserResponse> RefreshTokenAsync(RefreshTokenRequest refreshTokenRequest)
         {
-            _logger.LogInformation("Refreshing token");
-            //Hash the incoming refresh token and compare it with the one in the database
-            using var sha256 = SHA256.Create();
-            var refreshTokenHash = sha256.ComputeHash(Encoding.UTF8.GetBytes(refreshTokenRequest.RefreshToken));
-            var refreshToken = Convert.ToBase64String(refreshTokenHash);
-            //find user base on resfresh token
-            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
+            _logger.LogInformation("Verifying access token and refresh token");
+
+
+            // Find user by refresh token
+            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshTokenRequest.RefreshToken);
             if (user == null)
             {
                 _logger.LogInformation("Invalid refresh token");
@@ -168,8 +224,25 @@ namespace AuthJWT.Services.Implements
                 _logger.LogInformation("Refresh token expired");
                 throw new Exception("Refresh token expired");
             }
+
+
+            var principal = _tokenService.GetPrincipalFromExpiredToken(refreshTokenRequest.AccessToken);
+            if (principal == null)
+            {
+                _logger.LogInformation("Invalid access token");
+                throw new Exception("Invalid access token");
+            }
+
+            var userIdClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdClaim) || userIdClaim != user.Id)
+            {
+                _logger.LogInformation("Access token and refresh token don't match");
+                throw new Exception("Access token and refresh token don't match");
+            }
+            
+
             var newAccessToken = await _tokenService.GenerateToken(user);
-            _logger.LogInformation("Token refreshed successfully");
+            _logger.LogInformation("Token verified and refreshed successfully");
             var currentUserRes = _mapper.Map<CurrentUserResponse>(user);
             currentUserRes.AccessToken = newAccessToken;
             return currentUserRes;

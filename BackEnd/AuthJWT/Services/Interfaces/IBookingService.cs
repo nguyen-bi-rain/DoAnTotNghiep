@@ -1,12 +1,14 @@
+using AuthJWT.Domain.Contracts;
 using AuthJWT.Domain.DTOs;
+using AuthJWT.Domain.Entities.Common;
 
 namespace AuthJWT.Services.Interfaces
 {
     public interface IBookingService
     {
-        Task AddBookingAsync(BookingCreateDto bookingDtos);
+        Task<Booking> AddBookingAsync(BookingCreateDto bookingDtos);
         Task<IEnumerable<BookingResponse>> GetBookingsByHotelIdAsync(Guid hotelId, string? status);
-        Task<IEnumerable<BookingResponse>> GetBookingsByUserIdAsync(string userId, string? status);
+        Task<PaginateList<BookingResponse>> GetBookingsByUserIdAsync(string userId, string? status,int pageNumber, int pageSize);
         Task UpdatStatusBookingAsync(Guid bookingId,string status,string? cancellationReason);
         Task UpdateBookignAsync(Guid bookindId, BookingCreateDto bookingDtos);
         Task<bool> VerifyBookingAsync(Guid bookingId, string userId);

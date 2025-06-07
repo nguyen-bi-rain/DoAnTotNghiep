@@ -35,19 +35,7 @@ namespace AuthJWT.Services.Implements
                 model.AvailableRooms = room.NumberOfRooms;
                 var entity = await _unitOfWork.RoomRepository.AddAsync(model);
 
-                if (room.Conveniences != null && room.Conveniences.Any())
-                {
-                    foreach (var convenience in room.Conveniences)
-                    {
-                        var roomConvenice = new RoomConvenienceCreateDto
-                        {
-                            RoomId = entity.Id,
-                            ConvenienceId = convenience.ConvenienceId
-                        };
-
-                        await _roomConveniceService.AddRoomConveniceAsync(roomConvenice);
-                    }
-                }
+            
                 if (files != null && files.Any())
                 {
                     await _roomImageService.AddRoomImageAsync(entity.Id, files);
@@ -161,14 +149,12 @@ namespace AuthJWT.Services.Implements
             return roomDto;
         }
 
-        public async Task<PaginateList<RoomDto>> GetRoomsByHotelIdAsync(Guid hotelId,int capacity, int pageIndex = 1, int pageSize = 10, string? search = null,DateTime? checkIn = null, DateTime? checkOut = null)
+        public async Task<PaginateList<RoomDto>> GetRoomsByHotelIdAsync(Guid hotelId, int capacity, int pageIndex = 1, int pageSize = 10, string? search = null, DateTime? checkIn = null, DateTime? checkOut = null)
         {
             var roomsQuery = _unitOfWork.RoomRepository.GetQuery(r => r.HotelId == hotelId)
                                                         .Include(r => r.RoomImages)
                                                         .Include(r => r.Conveniences)
                                                             .ThenInclude(rc => rc.Convenience)
-                                                        .Include(r => r.Bookings)
-                                                        .ThenInclude(b => b.Booking)
                                                         .AsQueryable();
 
             if (!string.IsNullOrEmpty(search))
@@ -182,43 +168,46 @@ namespace AuthJWT.Services.Implements
                 roomsQuery = roomsQuery.Where(r => r.Capacity >= capacity);
             }
 
-            // Filter by availability in the given date range
-            if (checkIn.HasValue && checkOut.HasValue)
-            {
-                var ci = checkIn.Value.Date;
-                var co = checkOut.Value.Date;
-
-                roomsQuery = roomsQuery.Where(room =>
-                    // Room must have at least 1 available room
-                    room.AvailableRooms > 0 &&
-                    // Room is available if all bookings do not overlap with requested range
-                    !room.Bookings.Any(b =>
-                        // Only consider bookings that are not cancelled
-                        b.Booking.Status != "Cancelled" &&
-                        (
-                            (b.Booking.CheckInDate < co && b.Booking.CheckOutDate > ci)
-                        )
-                    )
-                );
-            }
-
+            // Lấy danh sách phòng theo phân trang
             var totalCount = await roomsQuery.CountAsync();
             if (totalCount == 0)
             {
                 throw new ResourceNotFoundException("No rooms found for this hotel.");
             }
 
-            var models = await roomsQuery
-                .OrderBy(r => r.RoomName)
-                .Skip((pageIndex - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+    
 
-            var roomDtos = _mapper.Map<List<RoomDto>>(models);
+            // Materialize the query to avoid multiple open connections
+            var roomsList = await roomsQuery.ToListAsync();
 
+            // Đếm số lượng phòng trống cho từng phòng trong khoảng thời gian checkIn - checkOut
+            foreach (var room in roomsList)
+            {
+                int bookedCount = 0;
+                if (checkIn.HasValue && checkOut.HasValue)
+                {
+                    bookedCount = await _unitOfWork.BookingRoomRepository.GetQuery()
+                        .Include(br => br.Booking)
+                        .Where(br =>
+                            br.RoomId == room.Id &&
+                            br.Booking.Status != "Cancelled" &&
+                            br.Booking.CheckInDate < checkOut &&
+                            br.Booking.CheckOutDate > checkIn
+                        )
+                        .CountAsync();
+                }
+                room.AvailableRooms = Math.Max(0, room.NumberOfRooms - bookedCount);
+            }
+
+            var roomDtos = _mapper.Map<List<RoomDto>>(roomsList);
+
+            // Gán số lượng phòng trống vào trường Available của RoomDto
             foreach (var roomDto in roomDtos)
             {
-                if (roomDto.RoomImages != null && roomDto.RoomImages.Any())
+                var roomModel = roomsList.FirstOrDefault(r => r.Id == roomDto.Id);
+                roomDto.AvailableRooms = roomModel?.AvailableRooms ?? 0;
+
+                if (roomDto.RoomImages != null && roomDto.RoomImages.Count > 0)
                 {
                     foreach (var image in roomDto.RoomImages)
                     {
@@ -227,23 +216,20 @@ namespace AuthJWT.Services.Implements
                 }
 
                 // Map conveniences with details from Convenience entity
-                if (roomDto.Conveniences != null && roomDto.Conveniences.Any())
+                if (roomDto.Conveniences != null && roomDto.Conveniences.Count > 0)
                 {
                     foreach (var conv in roomDto.Conveniences)
                     {
-                        // Find the matching RoomConvenience in the model to get full Convenience info
-                        var roomModel = models.FirstOrDefault(r => r.Id == roomDto.Id);
                         var roomConv = roomModel?.Conveniences.FirstOrDefault(c => c.ConvenienceId == conv.Id);
                         if (roomConv != null && roomConv.Convenience != null)
                         {
                             conv.Name = roomConv.Convenience.Name;
-                            conv.Description = roomConv.Convenience.Description;
+                            conv.Description = roomConv.Convenience?.Description ?? string.Empty;
                             conv.Type = roomConv.Convenience.Type;
                         }
                     }
                 }
             }
-
             var paging = new PaginateList<RoomDto>(roomDtos, totalCount, pageIndex, pageSize);
             return paging;
         }

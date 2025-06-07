@@ -46,8 +46,8 @@ namespace AuthJWT.Controllers
             var response = await _userService.GetByIdAsync(id);
             return Ok(response);
         }
+        
         [HttpPost("refresh-token")]
-        [Authorize(Roles = "User,Admin,HotelOwner")]
         public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
         {
             var response = await _userService.RefreshTokenAsync(request);
@@ -123,6 +123,27 @@ namespace AuthJWT.Controllers
             {
                 return BadRequest(ex.Message);
             }
+        }
+
+        [HttpGet("get-all-users")]
+        public async Task<IActionResult> GetAllUsers([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? searchTerm = null)
+        {
+            var response = await _userService.GetAllUsersAsync(pageNumber, pageSize, searchTerm);
+            return Ok(response);
+        }
+        [HttpPut("change-status/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ChangeStatus(Guid id, [FromQuery] bool status)
+        {
+            await _userService.ChnageStatusAsync(id, status);
+            return Ok();
+        }
+        [HttpDelete("delete-user/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteUser(string id)
+        {
+            await _userService.DeleteUserAsync(id);
+            return Ok(new { Message = "User deleted successfully" });
         }
 
     }

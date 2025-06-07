@@ -32,7 +32,6 @@ public interface IUnitOfWork : IDisposable
     IRepository<HotelImage> HotelImageRepository { get; }
     IRepository<RoomImage> RoomImageRepository { get; }
     IRepository<Policy> PolicyRepository { get; }
-    IRepository<CancellationReason> CancellationReasonRepository { get; }
     IRepository<BookingRoom> BookingRoomRepository { get; }
 
 

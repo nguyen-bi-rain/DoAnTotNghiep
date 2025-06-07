@@ -26,7 +26,7 @@ namespace AuthJWT.Services.Implements
             _sendEmailService = sendEmailService;
         }
 
-        public async Task AddBookingAsync(BookingCreateDto bookingDtos)
+        public async Task<Booking> AddBookingAsync(BookingCreateDto bookingDtos)
         {
             // Map booking and its rooms
             var booking = _mapper.Map<Booking>(bookingDtos);
@@ -39,7 +39,7 @@ namespace AuthJWT.Services.Implements
             }
 
             // Add booking (with rooms) to the context
-            await _unitOfWork.BookingRepository.AddAsync(booking);
+            var res = await _unitOfWork.BookingRepository.AddAsync(booking);
 
             // Update room quantities
             foreach (var bookingRoom in booking.BookingRooms)
@@ -53,6 +53,7 @@ namespace AuthJWT.Services.Implements
             {
                 throw new DatabaseBadRequestException("Failed to create booking.");
             }
+            return res;
         }
 
         public async Task<IEnumerable<BookingResponse>> GetBookingsByHotelIdAsync(Guid hotelId,string? status)
@@ -110,7 +111,7 @@ namespace AuthJWT.Services.Implements
             return bookingResponses;
         }
 
-        public async Task<IEnumerable<BookingResponse>> GetBookingsByUserIdAsync(string userId,string? status)
+        public async Task<PaginateList<BookingResponse>> GetBookingsByUserIdAsync(string userId,string? status, int pageNumber, int pageSize)
         {
             var bookings = await _unitOfWork.BookingRepository.GetQuery()
                  .Include(x => x.BookingRooms)
@@ -159,7 +160,7 @@ namespace AuthJWT.Services.Implements
 
                 bookingResponses.Add(bookingResponse);
             }
-            return bookingResponses;
+            return PaginateList<BookingResponse>.Create(bookingResponses, pageNumber, pageSize);
 
         }
 
@@ -222,12 +223,12 @@ namespace AuthJWT.Services.Implements
             }
 
             booking.Status = status;
-            if (cancellationReason != null && status == "Cancelled")
+            if (cancellationReason != null && status == "cancelled")
             {
                 booking.CancellationReason = cancellationReason;
             }
 
-            if (status == "Cancelled")
+            if (status == "cancelled")
             {
                 foreach (var bookingRoom in booking.BookingRooms)
                 {

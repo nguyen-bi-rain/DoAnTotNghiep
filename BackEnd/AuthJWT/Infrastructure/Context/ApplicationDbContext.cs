@@ -13,7 +13,6 @@ namespace AuthJWT.Infrastructure.Context
         {
         }
         public DbSet<Policy> Policies { get; set; }
-        public DbSet<CancellationReason> CancellationReasons { get; set; }
         public DbSet<BookingRoom> BookingRooms { get; set; }
         public DbSet<ApplicationUser> ApplicationUsers { get; set; }
         public DbSet<Location> Locations { get; set; }

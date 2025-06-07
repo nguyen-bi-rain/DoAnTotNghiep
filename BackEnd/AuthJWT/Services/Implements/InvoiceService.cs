@@ -37,12 +37,35 @@ namespace AuthJWT.Services.Implements
             {
                 throw new Exception($"No invoices found for hotel with Id : {hotelId}");
             }
-            return _mapper.Map<IEnumerable<InvoiceDto>>(invoices);
+            var invoiceDtos = new List<InvoiceDto>();
+            foreach (var invoice in invoices)
+            {
+                var invoiceDto = new InvoiceDto
+                {
+                    Id = invoice.Id,
+                    BookingId = invoice.BookingId,
+                    UserName = invoice.User.FirstName != null ? $"{invoice.User.FirstName} {invoice.User.LastName}" : string.Empty,
+                    InvoiceNumber = invoice.InvoiceNumber,
+                    IssueDate = invoice.IssueDate,
+                    DueDate = invoice.DueDate,
+                    SubTotal = invoice.SubTotal,
+                    TaxAmount = invoice.TaxAmount,
+                    TotalAmount = invoice.TotalAmount,
+                    Status = invoice.Status,
+                    PaymentMethod = invoice.PaymentMethod,
+                    Notes = invoice.Notes
+                };
+                invoiceDtos.Add(invoiceDto);
+            }
+
+            return invoiceDtos;
         }
 
-        public async Task<IEnumerable<InvoiceDto>> GetInvoicesByUserIdAsync(string userId)
+        public async Task<IEnumerable<InvoiceForUser>> GetInvoicesByUserIdAsync(string userId)
         {
             var invoices = await _unitOfWork.InvoiceRepository.GetQuery()
+                .Include(x => x.Booking)
+                .ThenInclude(x => x.Hotel)
                 .Include(x => x.Booking)
                 .ThenInclude(x => x.User)
                 .Where(x => x.Booking.UserId == userId)
@@ -52,7 +75,31 @@ namespace AuthJWT.Services.Implements
             {
                 throw new Exception($"No invoices found for user with Id : {userId}");
             }
-            return _mapper.Map<IEnumerable<InvoiceDto>>(invoices);
+
+            var invoiceDtos = new List<InvoiceForUser>();
+            foreach (var invoice in invoices)
+            {
+                var invoiceDto = new InvoiceForUser
+                {
+                    HotelName = invoice.Booking.Hotel.Name,
+                    HotelAddress = invoice.Booking.Hotel.Address,
+                    Id = invoice.Id,
+                    BookingId = invoice.BookingId,
+                    UserName = invoice.User.FirstName != null ? $"{invoice.User.FirstName} {invoice.User.LastName}" : string.Empty,
+                    InvoiceNumber = invoice.InvoiceNumber,
+                    IssueDate = invoice.IssueDate,
+                    DueDate = invoice.DueDate,
+                    SubTotal = invoice.SubTotal,
+                    TaxAmount = invoice.TaxAmount,
+                    TotalAmount = invoice.TotalAmount,
+                    Status = invoice.Status,
+                    PaymentMethod = invoice.PaymentMethod,
+                    Notes = invoice.Notes
+                };
+                invoiceDtos.Add(invoiceDto);
+            }
+
+            return invoiceDtos;
         }
 
         public async Task UpdateStatusInvoiceAsync(Guid invoiceId, string status)

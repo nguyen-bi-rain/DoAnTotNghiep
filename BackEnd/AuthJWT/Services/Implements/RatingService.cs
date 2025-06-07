@@ -83,6 +83,7 @@ public class RatingService : IRatingService
             Title = r.Title,
         }).ToList();
 
+        
         var ratingResponses = await Task.WhenAll(ratingResponseTasks);
 
         return PaginateList<RatingResponse>.Create(ratingResponses, pageIndex, pageSize);

@@ -46,9 +46,7 @@ namespace AuthJWT.UnitOfWorks
         public IRepository<RoomImage> RoomImageRepository => _roomImageRepository ??= new Repository<RoomImage>(_context, _currentUser);
         private IRepository<Policy>? _policyRepository;
         public IRepository<Policy> PolicyRepository => _policyRepository ??= new Repository<Policy>(_context, _currentUser);
-        private IRepository<CancellationReason>? _cancellationReasonRepository;
 
-        public IRepository<CancellationReason> CancellationReasonRepository => _cancellationReasonRepository ??= new Repository<CancellationReason>(_context, _currentUser);
         private IRepository<BookingRoom>? _bookingRoomRepository;
 
         public IRepository<BookingRoom> BookingRoomRepository => _bookingRoomRepository ??= new Repository<BookingRoom>(_context, _currentUser);

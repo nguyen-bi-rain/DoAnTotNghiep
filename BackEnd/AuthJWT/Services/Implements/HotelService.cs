@@ -35,42 +35,45 @@ namespace AuthJWT.Services.Implements
                 throw new ResourceUniqueException("Hotel with the same name already exists.");
             }
 
+            // Map hotel but exclude Policies and Conveniences collections
             var model = _mapper.Map<Hotel>(hotel);
+            // Clear any collections that might have been mapped
+            model.Policies = new List<Policy>();
+            model.HotelConveniences = new List<HotelConvenience>();
+
             var res = await _unitOfWork.HotelRepository.AddAsync(model);
+
+            // Handle hotel images
             if (files != null && files.Count > 0)
             {
                 for (int i = 0; i < files.Count; i++)
                 {
-                    if (i == 0)
+                    var hotelImage = new HotelImageCreateDto
                     {
-                        var hotelImage = new HotelImageCreateDto
-                        {
-                            HotelId = res.Id,
-                            ImageType = "Thumbnail"
-                        };
-                        await _hotelImageService.CreateHotelImageAsync(hotelImage, files[i]);
-                    }
-                    else
-                    {
-                        var hotelImage = new HotelImageCreateDto
-                        {
-                            HotelId = res.Id,
-                            ImageType = "Hotel"
-                        };
-                        await _hotelImageService.CreateHotelImageAsync(hotelImage, files[i]);
-                    }
+                        HotelId = res.Id,
+                        ImageType = i == 0 ? "Thumbnail" : "Hotel"
+                    };
+                    await _hotelImageService.CreateHotelImageAsync(hotelImage, files[i]);
                 }
             }
+
+            // Add policies
             if (hotel.Policies != null)
             {
                 foreach (var item in hotel.Policies)
                 {
-                    var policy = _mapper.Map<Policy>(item);
-                    policy.HotelId = res.Id;
+                    var policy = new Policy
+                    {
+                        HotelId = res.Id,
+                        CreatedAt = DateTime.UtcNow,
+                        PolicyDetails = item.PolicyDetails,
+                        PolicyType = item.PolicyType
+                    };
                     await _unitOfWork.PolicyRepository.AddAsync(policy);
                 }
             }
 
+            // Add conveniences
             if (hotel.Conveniences != null)
             {
                 foreach (var item in hotel.Conveniences)
@@ -180,72 +183,88 @@ namespace AuthJWT.Services.Implements
 
         public async Task<PaginateList<HotelResponse>> SearchAvailableRoom(DateTime fromDate, DateTime endDate, int numberGuest, string location, int pageNumber = 1, int pageSize = 10, int sort = 1)
         {
-            var availableHotels = await _unitOfWork.HotelRepository.GetQuery()
-                .Where(h => h.IsApproved)
-                .Where(h => h.Location.City == location)
-                .Select(h => new
+            // Query hotels with available rooms
+            var query = _unitOfWork.HotelRepository.GetQuery()
+                .Include(h => h.Location)
+                .Include(h => h.HotelImages)
+                .Include(h => h.Ratings)
+                .Include(h => h.Rooms)
+                    .ThenInclude(r => r.Bookings)
+                        .ThenInclude(b => b.Booking)
+                .Where(h => h.IsApproved && h.Location.City == location);
+
+            // Filter hotels with at least one available room
+            var hotels = await query.ToListAsync();
+
+            var availableHotels = hotels
+                .Select(hotel =>
                 {
-                    Hotel = h,
-                    Rooms = h.Rooms.Where(r => r.Capacity >= numberGuest &&
-                        !r.Bookings.Any(br =>
-                            (br.Booking.Status == "Confirmed" || br.Booking.Status == "Pending")
-                            && fromDate < br.Booking.CheckOutDate
-                            && endDate > br.Booking.CheckInDate
-                        ))
+                    var availableRooms = hotel.Rooms
+                        .Where(r => r.Capacity >= numberGuest &&
+                            !r.Bookings.Any(br =>
+                                (br.Booking.Status == "Confirmed" || br.Booking.Status == "Pending") &&
+                                fromDate < br.Booking.CheckOutDate &&
+                                endDate > br.Booking.CheckInDate
+                            ))
+                        .ToList();
+
+                    return new
+                    {
+                        Hotel = hotel,
+                        Rooms = availableRooms
+                    };
                 })
                 .Where(x => x.Rooms.Any())
-                .Select(x => new
+                .ToList();
+
+            // Project to HotelResponse
+            var hotelResponses = new List<HotelResponse>();
+            foreach (var h in availableHotels)
+            {
+                var thumbnail = h.Hotel.HotelImages
+                    .Where(i => i.ImageType == "Thumbnail")
+                    .Select(i => i.ImageUrl)
+                    .FirstOrDefault();
+
+                var ratingValue = h.Hotel.Ratings.Any()
+                    ? h.Hotel.Ratings.Average(r => r.RatingValue)
+                    : 0;
+
+                var hotelResponse = new HotelResponse
                 {
-                    x.Hotel.Id,
-                    x.Hotel.Name,
-                    x.Hotel.ShortDescription,
-                    Thumbnail = x.Hotel.HotelImages
-                        .Where(i => i.ImageType == "Thumbnail")
-                        .Select(i => i.ImageUrl)
-                        .FirstOrDefault(),
-                    RatingCount = x.Hotel.Ratings.Count(),
-                    RatingValue = x.Hotel.Ratings.Any()
-                        ? x.Hotel.Ratings.Average(r => r.RatingValue).ToString()
-                        : "0",
-                    Location = x.Hotel.Location.City + ", " + x.Hotel.Location.Country,
-                    Price = x.Rooms.Min(r => r.PricePerNight)
-                })
-                .OrderBy(h => h.Price)
-                .Distinct()
-                .ToListAsync();
-            var result = availableHotels.Select(async h => new HotelResponse
-            {
-                Id = h.Id,
-                Name = h.Name,
-                ShortDescription = h.ShortDescription,
-                Thumnail = await _s3Service.GetFileUrlAsync(h.Thumbnail.ToString()),
-                RatingValue = h.RatingValue,
-                Location = h.Location,
-                Price = h.Price
-            });
-            if (sort == 1)
-            {
-                result = result.OrderBy(h => h.Result.Price).ToList();
-            }
-            else if (sort == 2)
-            {
-                result = result.OrderByDescending(h => h.Result.Price).ToList();
-            }
-            else if (sort == 3)
-            {
-                result = result.OrderBy(h => h.Result.RatingValue).ToList();
-            }
-            else if (sort == 4)
-            {
-                result = result.OrderByDescending(h => h.Result.RatingValue).ToList();
+                    Id = h.Hotel.Id,
+                    Name = h.Hotel.Name,
+                    ShortDescription = h.Hotel.ShortDescription,
+                    Thumnail = !string.IsNullOrEmpty(thumbnail.ToString()) ? await _s3Service.GetFileUrlAsync(thumbnail.ToString()) : string.Empty,
+                    RatingValue = ratingValue.ToString("0.0"),
+                    Location = $"{h.Hotel.Location.City}, {h.Hotel.Location.Country}",
+                    Price = h.Rooms.Min(r => r.PricePerNight),
+                    RatingCount = h.Hotel.Ratings.Count,
+                    
+                };
+                hotelResponses.Add(hotelResponse);
             }
 
+            // Sorting
+            switch (sort)
+            {
+                case 1:
+                    hotelResponses = hotelResponses.OrderBy(h => h.Price).ToList();
+                    break;
+                case 2:
+                    hotelResponses = hotelResponses.OrderByDescending(h => h.Price).ToList();
+                    break;
+                case 3:
+                    hotelResponses = hotelResponses.OrderBy(h => double.TryParse(h.RatingValue, out var rv) ? rv : 0).ToList();
+                    break;
+                case 4:
+                    hotelResponses = hotelResponses.OrderByDescending(h => double.TryParse(h.RatingValue, out var rv) ? rv : 0).ToList();
+                    break;
+            }
 
-
-            await Task.WhenAll(result);
-            var hotelResponseList = result.Select(h => h.Result).ToList();
-            // You may need to provide pageIndex and pageSize as parameters or set default values
-            return PaginateList<HotelResponse>.Create(hotelResponseList, pageNumber, pageSize);
+            // Pagination
+            var pagedList = PaginateList<HotelResponse>.Create(hotelResponses, pageNumber, pageSize);
+            return pagedList;
         }
 
         public async Task<HotelUpdateDto> UpdateHotelAsync(HotelUpdateDto hotel, List<IFormFile>? files)

@@ -12,8 +12,9 @@ namespace AuthJWT.Controllers
     {
         private readonly IBookingService _bookingService;
         private readonly IInvoiceService _invoiceService;
-        public BookingController(IBookingService bookingService)
+        public BookingController(IBookingService bookingService, IInvoiceService invoiceService)
         {
+            _invoiceService = invoiceService;
             _bookingService = bookingService;
         }
 
@@ -23,8 +24,8 @@ namespace AuthJWT.Controllers
         {
             try
             {
-                await _bookingService.AddBookingAsync(bookingCreateDto);
-                return Ok(new { message = "Booking created successfully." });
+                var res = await _bookingService.AddBookingAsync(bookingCreateDto);
+                return Ok(new { message = res.Id });
             }
             catch (Exception ex)
             {
@@ -63,12 +64,12 @@ namespace AuthJWT.Controllers
 
         [HttpGet("user/{userId}")]
         [Authorize(Roles = "User,HotelOwner,Admin")]
-        public async Task<IActionResult> GetBookingsByUserId(string userId, string? status)
+        public async Task<IActionResult> GetBookingsByUserId(string userId, string? status, int pageNumber = 1, int pageSize = 10)
         {
             try
             {
-                var bookings = await _bookingService.GetBookingsByUserIdAsync(userId, status);
-                return Ok(ApiResponse<IEnumerable<BookingResponse>>.Success(bookings));
+                var bookings = await _bookingService.GetBookingsByUserIdAsync(userId, status, pageNumber, pageSize);
+                return Ok(ApiResponse<PaginateList<BookingResponse>>.Success(bookings));
             }
             catch (Exception ex)
             {
@@ -83,6 +84,65 @@ namespace AuthJWT.Controllers
             {
                 var isVerified = await _bookingService.VerifyBookingAsync(bookingId, userId);
                 return Ok(new { isVerified });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+        [HttpPost("create-invoice")]
+        [Authorize(Roles = "User,HotelOwner")]
+        public async Task<IActionResult> CreateInvoice([FromBody] InvoiceCreateDto invoiceCreateDto)
+        {
+            try
+            {
+                await _invoiceService.AddInvoiceAsync(invoiceCreateDto);
+                return Ok(new { message = "Invoice created successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+        [HttpGet("hotel-invoices/{hotelId}")]
+        [Authorize(Roles = "HotelOwner,Admin")]
+        [ProducesResponseType(typeof(InvoiceDto), 200)]
+        public async Task<IActionResult> GetInvoicesByHotelId(Guid hotelId)
+        {
+            try
+            {
+                var invoices = await _invoiceService.GetInvoicesByHotelIdAsync(hotelId);
+                return Ok(ApiResponse<IEnumerable<InvoiceDto>>.Success(invoices));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+        [HttpGet("user-invoices/{userId}")]
+        [Authorize(Roles = "User,HotelOwner,Admin")]
+        [ProducesResponseType(typeof(InvoiceForUser), 200)]
+
+        public async Task<IActionResult> GetInvoicesByUserId(string userId)
+        {
+            try
+            {
+                var invoices = await _invoiceService.GetInvoicesByUserIdAsync(userId);
+                return Ok(ApiResponse<IEnumerable<InvoiceForUser>>.Success(invoices));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+        [HttpPut("update-invoice-status/{invoiceId}")]
+        [Authorize(Roles = "User,HotelOwner,Admin")]
+        public async Task<IActionResult> UpdateInvoiceStatus(Guid invoiceId, string status)
+        {
+            try
+            {
+                await _invoiceService.UpdateStatusInvoiceAsync(invoiceId, status);
+                return Ok(new { message = "Invoice status updated successfully." });
             }
             catch (Exception ex)
             {

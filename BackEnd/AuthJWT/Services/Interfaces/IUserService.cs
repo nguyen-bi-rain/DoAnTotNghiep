@@ -8,12 +8,13 @@ namespace AuthJWT.Services.Interfaces
         Task<CurrentUserResponse> GetCurrentUserAsync();
         Task<UserProfileResponse> GetByIdAsync(Guid id);
         Task UpdateUserAsync(Guid id, UpdateUserRequest userRequest);
-        Task DeleteUserAsync(Guid id);
         Task<RevokeRefreshTokenResponse> RevokeRefreshToken(RefreshTokenRequest refreshTokenRequest);
         Task<CurrentUserResponse> RefreshTokenAsync(RefreshTokenRequest refreshTokenRequest);
         Task<UserResponse> LoginAsync(UserLoginRequest userRequest);
-        Task ChangePasswordAsync(Guid id,ChangePasswordRequest changePasswordRequest);
+        Task ChangePasswordAsync(Guid id, ChangePasswordRequest changePasswordRequest);
         Task UserAvatarAsync(string id, IFormFile file);
-
+        Task<PaginateList<UserDto>> GetAllUsersAsync(int pageNumber, int pageSize, string? searchTerm = null);
+        Task ChnageStatusAsync(Guid id, bool status);
+        Task DeleteUserAsync(string id);
     }
 }
