@@ -14,7 +14,7 @@ namespace AuthJWT.Services.Interfaces
         Task ChangePasswordAsync(Guid id, ChangePasswordRequest changePasswordRequest);
         Task UserAvatarAsync(string id, IFormFile file);
         Task<PaginateList<UserDto>> GetAllUsersAsync(int pageNumber, int pageSize, string? searchTerm = null);
-        Task ChnageStatusAsync(Guid id, bool status);
+        Task ChnageStatusAsync(string id, bool status);
         Task DeleteUserAsync(string id);
     }
 }

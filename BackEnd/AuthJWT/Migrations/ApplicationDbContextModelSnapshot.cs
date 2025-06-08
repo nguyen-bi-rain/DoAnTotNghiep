@@ -108,39 +108,6 @@ namespace AuthJWT.Migrations
                     b.ToTable("BookingRooms");
                 });
 
-            modelBuilder.Entity("AuthJWT.Domain.Entities.Common.CancellationReason", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("BookingId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("CancellationDate")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("RefundAmount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("RefundStatus")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BookingId");
-
-                    b.ToTable("CancellationReasons");
-                });
-
             modelBuilder.Entity("AuthJWT.Domain.Entities.Common.Convenience", b =>
                 {
                     b.Property<Guid>("Id")
@@ -931,17 +898,6 @@ namespace AuthJWT.Migrations
                     b.Navigation("Booking");
 
                     b.Navigation("Room");
-                });
-
-            modelBuilder.Entity("AuthJWT.Domain.Entities.Common.CancellationReason", b =>
-                {
-                    b.HasOne("AuthJWT.Domain.Entities.Common.Booking", "Booking")
-                        .WithMany()
-                        .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Booking");
                 });
 
             modelBuilder.Entity("AuthJWT.Domain.Entities.Common.Hotel", b =>

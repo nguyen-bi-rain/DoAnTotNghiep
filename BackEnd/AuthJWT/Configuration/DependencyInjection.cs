@@ -32,6 +32,7 @@ namespace AuthJWT.Configuration
             services.AddScoped<IConvenienceService, ConvenienceService>();
             services.AddScoped<IBookingService, BookingService>();
             services.AddScoped<IInvoiceService, InvoiceService>();
+            services.AddScoped<IDashboardService, DashboardService>();
             
             return services;
         }

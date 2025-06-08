@@ -1,3 +1,4 @@
+using AuthJWT.Domain.Contracts;
 using AuthJWT.Domain.DTOs;
 using AuthJWT.Domain.Entities.Common;
 using AuthJWT.Services.Interfaces;
@@ -25,20 +26,30 @@ namespace AuthJWT.Services.Implements
             await _unitOfWork.SaveChangesAsync();
         }
 
-        public async Task<IEnumerable<InvoiceDto>> GetInvoicesByHotelIdAsync(Guid hotelId)
+        public async Task<PaginateList<InvoiceDto>> GetInvoicesByHotelIdAsync(Guid hotelId , int pageNumber = 1, int pageSize = 10, string? search = null, string? status = null)
         {
-            var invoices = await _unitOfWork.InvoiceRepository.GetQuery()
+            var query = _unitOfWork.InvoiceRepository.GetQuery()
                 .Include(x => x.Booking)
                 .ThenInclude(x => x.User)
-                .Where(x => x.Booking.HotelId == hotelId)
-                .ToListAsync();
+                .Where(x => x.Booking.HotelId == hotelId);
 
-            if (invoices == null || !invoices.Any())
+            // Add search condition
+            if (!string.IsNullOrEmpty(search))
             {
-                throw new Exception($"No invoices found for hotel with Id : {hotelId}");
+                query = query.Where(x => x.InvoiceNumber.Contains(search) || 
+                                        x.User.FirstName.Contains(search) || 
+                                        x.User.LastName.Contains(search));
             }
+
+            // Add status condition
+            if (!string.IsNullOrEmpty(status))
+            {
+                query = query.Where(x => x.Status == status);
+            }
+
+
             var invoiceDtos = new List<InvoiceDto>();
-            foreach (var invoice in invoices)
+            foreach (var invoice in query)
             {
                 var invoiceDto = new InvoiceDto
                 {
@@ -58,7 +69,7 @@ namespace AuthJWT.Services.Implements
                 invoiceDtos.Add(invoiceDto);
             }
 
-            return invoiceDtos;
+            return PaginateList<InvoiceDto>.Create(invoiceDtos, pageNumber, pageSize);
         }
 
         public async Task<IEnumerable<InvoiceForUser>> GetInvoicesByUserIdAsync(string userId)

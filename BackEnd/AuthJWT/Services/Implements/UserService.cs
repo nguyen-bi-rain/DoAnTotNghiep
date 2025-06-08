@@ -64,20 +64,26 @@ namespace AuthJWT.Services.Implements
             }
         }
 
-        public async Task ChnageStatusAsync(Guid id, bool status)
+        public async Task ChnageStatusAsync(string id, bool status)
         {
-            var user = await _userManager.FindByIdAsync(id.ToString());
+            var user = await _userManager.FindByIdAsync(id);
             if (user == null)
             {
+                _logger.LogInformation("User not found");
                 throw new Exception("User not found");
             }
+
             user.isActive = status;
             var result = await _userManager.UpdateAsync(user);
+
             if (!result.Succeeded)
             {
-                throw new Exception($"Failed to change user status: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                _logger.LogInformation("Failed to update user status: {errors}", errors);
+                throw new Exception($"Failed to update user status: {errors}");
             }
-    
+
+            _logger.LogInformation("User status updated successfully");
         }
 
 

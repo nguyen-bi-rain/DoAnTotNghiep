@@ -56,7 +56,7 @@ namespace AuthJWT.Services.Implements
             return res;
         }
 
-        public async Task<IEnumerable<BookingResponse>> GetBookingsByHotelIdAsync(Guid hotelId,string? status)
+        public async Task<PaginateList<BookingResponse>> GetBookingsByHotelIdAsync(Guid hotelId,string? status, int pageNumber, int pageSize)
         {
             var bookings = await _unitOfWork.BookingRepository.GetQuery()
                 .Include(x => x.BookingRooms)
@@ -69,7 +69,7 @@ namespace AuthJWT.Services.Implements
 
             if (status != null)
             {
-                bookings = bookings.Where(x => x.Status.ToLower() == status.ToLower()).ToList();
+                bookings = bookings.Where(x => x.Status == status).ToList();
             }
 
             if (bookings == null || !bookings.Any())
@@ -108,7 +108,7 @@ namespace AuthJWT.Services.Implements
             }
 
 
-            return bookingResponses;
+            return PaginateList<BookingResponse>.Create(bookingResponses, pageNumber, pageSize);
         }
 
         public async Task<PaginateList<BookingResponse>> GetBookingsByUserIdAsync(string userId,string? status, int pageNumber, int pageSize)
@@ -216,6 +216,7 @@ namespace AuthJWT.Services.Implements
         {
             var booking = await _unitOfWork.BookingRepository.GetQuery(x => x.Id == bookingId)
                 .Include(x => x.User)
+                .Include(x => x.BookingRooms)
                 .FirstOrDefaultAsync();
             if (booking == null)
             {

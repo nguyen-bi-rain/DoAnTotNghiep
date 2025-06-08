@@ -1,5 +1,8 @@
 using AuthJWT.Domain.Entities.Common;
+using AuthJWT.Domain.Entities.Security;
+using AuthJWT.Domain.Enums;
 using AuthJWT.Infrastructure.Context;
+using Microsoft.AspNetCore.Identity;
 
 namespace AuthJWT.Infrastructure.Data
 {
@@ -10,72 +13,172 @@ namespace AuthJWT.Infrastructure.Data
             using (var scope = app.ApplicationServices.CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                // context.Database.Migrate();
-                // if (!context.ApplicationUsers.Any())
-                // {
-                //     var user = new ApplicationUser
-                //     {
-                //         UserName = "admin",
-                //         Email = "admin@gmail.com",
-                //         DateOfBirth = DateTime.Now.AddYears(-20),
-                //         FirstName = "Admin",
-                //         LastName = "User",
-                //         PhoneNumber = "1234567890",
-                //         Gender = "Male",
-                //         Location = "test",
-                //         IdentifyNumber = "123456789",
-                //         isActive = true,
-                //         Avatar = ""
-                //     };
-                // var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-                // var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-                //     if (!await roleManager.RoleExistsAsync("Admin"))
-                //     {
-                //         var role = new IdentityRole
-                //         {
-                //             Name = "Admin",
-                //             NormalizedName = "ADMIN"
-                //         };
-                //         var role2 = new IdentityRole
-                //         {
-                //             Name = "User",
-                //             NormalizedName = "USER"
-                //         };
-                //         await roleManager.CreateAsync(role);
-                //         await roleManager.CreateAsync(role2);
-                //     }
-
-                // await roleManager.CreateAsync(new IdentityRole("HotelOwner"));
-                //     await userManager.CreateAsync(user, "Admin@123");
-                //     await userManager.AddToRoleAsync(user, "Admin");
-                // }
-                // SeedLocationData(context);
-                // SeedHotelData(context);
+                
+                await SeedRolesData(scope);
+                await SeedUserData(scope, context);
+                SeedRoomTypeData(context);
+                SeedLocationData(context);
                 SeedConvenienceData(context);
 
             }
         }
+        public static async Task SeedRolesData(IServiceScope scope)
+        {
+            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+            var roles = new List<string> { "Admin", "User", "HotelOwner" };
+
+            foreach (var role in roles)
+            {
+                if (!await roleManager.RoleExistsAsync(role))
+                {
+                    await roleManager.CreateAsync(new IdentityRole(role));
+                }
+            }
+        }
+
+
+        private static async Task SeedUserData(IServiceScope scope, ApplicationDbContext context)
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+            if (!context.ApplicationUsers.Any())
+            {
+                // Create roles if they don't exist
+                var adminRole = await roleManager.FindByNameAsync("Admin");
+                var userRole = await roleManager.FindByNameAsync("User");
+                var hotelOwnerRole = await roleManager.FindByNameAsync("HotelOwner");
+
+                if (adminRole == null)
+                {
+                    await roleManager.CreateAsync(new IdentityRole("Admin"));
+                }
+                if (userRole == null)
+                {
+                    await roleManager.CreateAsync(new IdentityRole("User"));
+                }
+                if (hotelOwnerRole == null)
+                {
+                    await roleManager.CreateAsync(new IdentityRole("HotelOwner"));
+                }
+
+                // Create Admin user
+                var adminUser = new ApplicationUser
+                {
+                    UserName = "admin",
+                    Email = "admin@gmail.com",
+                    DateOfBirth = DateTime.Now.AddYears(-30),
+                    FirstName = "Admin",
+                    LastName = "User",
+                    PhoneNumber = "0901234567",
+                    Gender = "Male",
+                    Location = "Ho Chi Minh City",
+                    IdentifyNumber = "123456789",
+                    isActive = true,
+                    Avatar = "",
+                    EmailConfirmed = true
+                };
+                await userManager.CreateAsync(adminUser, "Test123@");
+                await userManager.AddToRoleAsync(adminUser, "Admin");
+
+                // Create 5 regular users
+                for (int i = 1; i <= 5; i++)
+                {
+                    var user = new ApplicationUser
+                    {
+                        UserName = $"user{i}",
+                        Email = $"user{i}@gmail.com",
+                        DateOfBirth = DateTime.Now.AddYears(-25 - i),
+                        FirstName = $"User{i}",
+                        LastName = "Customer",
+                        PhoneNumber = $"090123456{i}",
+                        Gender = i % 2 == 0 ? "Female" : "Male",
+                        Location = "Hanoi",
+                        IdentifyNumber = $"12345678{i}",
+                        isActive = true,
+                        Avatar = "",
+                        EmailConfirmed = true
+                    };
+                    await userManager.CreateAsync(user, "Test123@");
+                    await userManager.AddToRoleAsync(user, "User");
+                }
+
+                // Create 5 hotel owner users
+                for (int i = 1; i <= 5; i++)
+                {
+                    var hotelOwner = new ApplicationUser
+                    {
+                        UserName = $"hotelowner{i}",
+                        Email = $"hotelowner{i}@gmail.com",
+                        DateOfBirth = DateTime.Now.AddYears(-35 - i),
+                        FirstName = $"Owner{i}",
+                        LastName = "Hotel",
+                        PhoneNumber = $"090876543{i}",
+                        Gender = i % 2 == 0 ? "Male" : "Female",
+                        Location = "Da Nang",
+                        IdentifyNumber = $"98765432{i}",
+                        isActive = true,
+                        isHotelOwner = true,
+                        Avatar = "",
+                        EmailConfirmed = true
+                    };
+                    await userManager.CreateAsync(hotelOwner, "Test123@");
+                    await userManager.AddToRoleAsync(hotelOwner, "HotelOwner");
+                }
+            }
+        }
+        private static void SeedRoomTypeData(ApplicationDbContext context)
+        {
+            if (context.RoomTypes.Any()) return;
+
+            var roomTypes = new List<RoomType>
+            {
+                new RoomType { RoomTypeName = "Standard Room", ShortDescription = "Basic room with essential amenities and comfortable furnishing" },
+                new RoomType { RoomTypeName = "Deluxe Room", ShortDescription = "Spacious room with upgraded amenities and better view" },
+                new RoomType { RoomTypeName = "Superior Room", ShortDescription = "Enhanced room with premium features and modern facilities" },
+                new RoomType { RoomTypeName = "Executive Suite", ShortDescription = "Luxurious suite with separate living area and business amenities" },
+                new RoomType { RoomTypeName = "Presidential Suite", ShortDescription = "Top-tier accommodation with exclusive services and premium location" },
+                new RoomType { RoomTypeName = "Family Room", ShortDescription = "Large room designed for families with multiple beds and extra space" },
+                new RoomType { RoomTypeName = "Twin Room", ShortDescription = "Room with two separate single beds ideal for friends or colleagues" },
+                new RoomType { RoomTypeName = "King Room", ShortDescription = "Room featuring a king-size bed with elegant decor and amenities" },
+                new RoomType { RoomTypeName = "Ocean View Room", ShortDescription = "Room with stunning ocean views and premium coastal amenities" },
+                new RoomType { RoomTypeName = "Penthouse Suite", ShortDescription = "Ultimate luxury accommodation with panoramic views and exclusive access" }
+            };
+
+            context.RoomTypes.AddRange(roomTypes);
+            context.SaveChanges();
+        }
+
+
+
         private static void SeedConvenienceData(ApplicationDbContext context)
         {
             if (context.Conveniences.Any()) return; // Đã có dữ liệu thì bỏ qua
 
             var conveniences = new List<Convenience>
             {
-                new Convenience { Name = "Wifi", Description = "Wifi miễn phí" },
-                new Convenience { Name = "Bể bơi", Description = "Bể bơi trong nhà" },
-                new Convenience { Name = "Gym", Description = "Phòng tập gym" },
-                new Convenience { Name = "Nhà hàng", Description = "Nhà hàng phục vụ ăn uống" },
-                new Convenience { Name = "Spa", Description = "Dịch vụ spa và massage" },
-                new Convenience { Name = "Đỗ xe miễn phí", Description = "Chỗ đỗ xe miễn phí" },
-                new Convenience { Name = "Thang máy", Description = "Thang máy trong tòa nhà" },
-                new Convenience { Name = "Dịch vụ phòng", Description = "Dịch vụ phục vụ tại phòng" },
-                new Convenience { Name = "Tiệc nướng BBQ", Description = "Tiệc nướng BBQ ngoài trời" },
-                new Convenience { Name = "Karaoke", Description = "Phòng karaoke" },
-                new Convenience { Name = "Trung tâm hội nghị", Description = "Phòng họp và hội nghị" },
-                new Convenience { Name = "Dịch vụ đưa đón sân bay", Description = "Dịch vụ đưa đón tại sân bay" },
-                new Convenience { Name = "Giặt là", Description = "Dịch vụ giặt là" },
-                new Convenience { Name = "Bãi biển riêng", Description = "Bãi biển riêng" },
-                new Convenience { Name = "Khu vui chơi trẻ em", Description = "Khu vui chơi cho trẻ em" },
+                // Room Conveniences
+                new Convenience { Name = "Air Conditioning", Description = "Climate control system for comfortable room temperature", Type = ConvenienceType.Room },
+                new Convenience { Name = "Free WiFi", Description = "Complimentary wireless internet access", Type = ConvenienceType.Room },
+                new Convenience { Name = "Flat Screen TV", Description = "Modern television with cable channels", Type = ConvenienceType.Room },
+                new Convenience { Name = "Mini Bar", Description = "In-room refrigerator with beverages and snacks", Type = ConvenienceType.Room },
+                new Convenience { Name = "Private Bathroom", Description = "En-suite bathroom with shower and toiletries", Type = ConvenienceType.Room },
+                new Convenience { Name = "Safe Box", Description = "In-room security safe for valuables", Type = ConvenienceType.Room },
+                new Convenience { Name = "Balcony", Description = "Private outdoor space with seating area", Type = ConvenienceType.Room },
+                new Convenience { Name = "Room Service", Description = "24-hour food and beverage delivery service", Type = ConvenienceType.Room },
+                new Convenience { Name = "Work Desk", Description = "Dedicated workspace with chair and lighting", Type = ConvenienceType.Room },
+                new Convenience { Name = "Complimentary Toiletries", Description = "Free bathroom amenities and towels", Type = ConvenienceType.Room },
+                
+                // Hotel Conveniences
+                new Convenience { Name = "Swimming Pool", Description = "Outdoor or indoor pool for guests relaxation", Type = ConvenienceType.Hotel },
+                new Convenience { Name = "Fitness Center", Description = "Fully equipped gym with modern exercise equipment", Type = ConvenienceType.Hotel },
+                new Convenience { Name = "Restaurant", Description = "On-site dining facility serving local and international cuisine", Type = ConvenienceType.Hotel },
+                new Convenience { Name = "Spa & Wellness Center", Description = "Professional spa services and wellness treatments", Type = ConvenienceType.Hotel },
+                new Convenience { Name = "Business Center", Description = "Professional workspace with meeting rooms and office services", Type = ConvenienceType.Hotel },
+                new Convenience { Name = "Concierge Service", Description = "Personal assistance for reservations and local recommendations", Type = ConvenienceType.Hotel },
+                new Convenience { Name = "Parking Facility", Description = "Secure parking space for guests vehicles", Type = ConvenienceType.Hotel },
+                new Convenience { Name = "Airport Shuttle", Description = "Complimentary transportation to and from airport", Type = ConvenienceType.Hotel },
+                new Convenience { Name = "Conference Rooms", Description = "Professional meeting and event spaces", Type = ConvenienceType.Hotel },
+                new Convenience { Name = "24-Hour Front Desk", Description = "Round-the-clock reception and guest services", Type = ConvenienceType.Hotel }
             };
 
             context.Conveniences.AddRange(conveniences);

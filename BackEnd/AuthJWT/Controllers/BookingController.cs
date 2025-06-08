@@ -34,12 +34,12 @@ namespace AuthJWT.Controllers
         }
         [HttpGet("hotel/{hotelId}")]
         [Authorize(Roles = "HotelOwner,Admin")]
-        public async Task<IActionResult> GetBookingsByHotelId(Guid hotelId, string? status)
+        public async Task<IActionResult> GetBookingsByHotelId(Guid hotelId, string? status, int pageNumber = 1, int pageSize = 10)
         {
             try
             {
-                var bookings = await _bookingService.GetBookingsByHotelIdAsync(hotelId, status);
-                return Ok(ApiResponse<IEnumerable<BookingResponse>>.Success(bookings));
+                var bookings = await _bookingService.GetBookingsByHotelIdAsync(hotelId, status, pageNumber, pageSize);
+                return Ok(ApiResponse<PaginateList<BookingResponse>>.Success(bookings));
             }
             catch (Exception ex)
             {
@@ -107,12 +107,12 @@ namespace AuthJWT.Controllers
         [HttpGet("hotel-invoices/{hotelId}")]
         [Authorize(Roles = "HotelOwner,Admin")]
         [ProducesResponseType(typeof(InvoiceDto), 200)]
-        public async Task<IActionResult> GetInvoicesByHotelId(Guid hotelId)
+        public async Task<IActionResult> GetInvoicesByHotelId(Guid hotelId, int pageNumber = 1, int pageSize = 10, string? search = null, string? status = null)
         {
             try
             {
-                var invoices = await _invoiceService.GetInvoicesByHotelIdAsync(hotelId);
-                return Ok(ApiResponse<IEnumerable<InvoiceDto>>.Success(invoices));
+                var invoices = await _invoiceService.GetInvoicesByHotelIdAsync(hotelId, pageNumber, pageSize, search, status);
+                return Ok(ApiResponse<PaginateList<InvoiceDto>>.Success(invoices));
             }
             catch (Exception ex)
             {

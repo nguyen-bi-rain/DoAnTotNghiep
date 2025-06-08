@@ -202,7 +202,7 @@ namespace AuthJWT.Services.Implements
                     var availableRooms = hotel.Rooms
                         .Where(r => r.Capacity >= numberGuest &&
                             !r.Bookings.Any(br =>
-                                (br.Booking.Status == "Confirmed" || br.Booking.Status == "Pending") &&
+                                (br.Booking.Status == "confirmed" || br.Booking.Status == "Pending") &&
                                 fromDate < br.Booking.CheckOutDate &&
                                 endDate > br.Booking.CheckInDate
                             ))

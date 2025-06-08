@@ -133,7 +133,7 @@ namespace AuthJWT.Controllers
         }
         [HttpPut("change-status/{id}")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> ChangeStatus(Guid id, [FromQuery] bool status)
+        public async Task<IActionResult> ChangeStatus(string id, [FromQuery] bool status)
         {
             await _userService.ChnageStatusAsync(id, status);
             return Ok();
