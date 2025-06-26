@@ -41,7 +41,7 @@ namespace AuthJWT.Services.Implements
             {
                 BucketName = _bucketName,
                 Key = $"BookingApp/{fileName}",
-                Expires = DateTime.UtcNow.AddMinutes(5)
+                Expires = DateTime.UtcNow.AddMinutes(15)
             };
 
             return await _s3Client.GetPreSignedURLAsync(request);

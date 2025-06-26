@@ -111,7 +111,6 @@ namespace AuthJWT.Controllers
             }
         }
         [HttpPost("verify-token")]
-        [Authorize(Roles = "User")]
         public async Task<IActionResult> VerifyHotelOwnerToken(string userId, string token)
         {
             try

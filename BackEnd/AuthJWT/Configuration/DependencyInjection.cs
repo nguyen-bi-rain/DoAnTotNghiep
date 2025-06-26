@@ -12,6 +12,7 @@ namespace AuthJWT.Configuration
     {
         public static IServiceCollection AddServices(this IServiceCollection services)
         {
+            services.AddHostedService<EmailKafkaConsumer>();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
             services.AddScoped<ITokenService, TokenService>();
             services.AddScoped<IUserService, UserService>();
@@ -33,6 +34,9 @@ namespace AuthJWT.Configuration
             services.AddScoped<IBookingService, BookingService>();
             services.AddScoped<IInvoiceService, InvoiceService>();
             services.AddScoped<IDashboardService, DashboardService>();
+            services.AddSingleton<VectorProcess>();
+            services.AddScoped<IRecommendationService, RecommendationService>();
+            services.AddScoped<IKafkaProducerService, KafkaProducerService>();
             
             return services;
         }

@@ -11,14 +11,16 @@ namespace AuthJWT.Services.Implements
 {
     public class BookingService : IBookingService
     {
+        private readonly IKafkaProducerService _kafkaProducerService;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly ISendEmailService _sendEmailService;
         private readonly IRoomService _roomService;
         private readonly IS3Service _s3Service;
 
-        public BookingService(IS3Service s3Service, IUnitOfWork unitOfWork, IMapper mapper, ISendEmailService sendEmailService, IRoomService roomService)
+        public BookingService(IS3Service s3Service, IUnitOfWork unitOfWork, IMapper mapper, ISendEmailService sendEmailService, IRoomService roomService, IKafkaProducerService kafkaProducerService)
         {
+            _kafkaProducerService = kafkaProducerService;
             _s3Service = s3Service;
             _roomService = roomService;
             _unitOfWork = unitOfWork;
@@ -268,13 +270,31 @@ namespace AuthJWT.Services.Implements
                         </body>
                     </html>"
             };
-            await _sendEmailService.SendEmailAsync(email);
+            var emailEvent = new EmailEvent
+            {
+                To = booking.User.Email,
+                Subject = "Booking Status Update",
+                Body = $@"
+                    <html>
+                        <body>
+                            <h2>Booking Status Update</h2>
+                            <p>Dear {booking.User.FirstName},</p>
+                            <p>Your booking status has been updated to <strong>{status}</strong>.</p>
+                            <p>Booking Id: {booking.Id}</p>
+                            {(!string.IsNullOrEmpty(cancellationReason) ? $"<p>Reason for cancellation: {cancellationReason}</p>" : "")}
+                            <p>Thank you for using our service.</p>
+                            <p>Best regards,</p>
+                            <p>Your Hotel Team</p>
+                        </body>
+                    </html>"
+            };
+            await _kafkaProducerService.PublishEmailEventAsync(emailEvent);
         }
 
         public Task<bool> VerifyBookingAsync(Guid bookingId, string userId)
         {
             return _unitOfWork.BookingRepository.GetQuery(x => x.Id == bookingId && x.UserId == userId)
-                .AnyAsync();
+                .AnyAsync(x => x.Status == "completed");
                 
         }
     }

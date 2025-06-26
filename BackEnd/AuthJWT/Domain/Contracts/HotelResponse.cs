@@ -1,6 +1,3 @@
-using AuthJWT.Domain.DTOs;
-using AuthJWT.Domain.Entities.Common;
-
 namespace AuthJWT.Domain.Contracts;
 
 public class HotelResponse

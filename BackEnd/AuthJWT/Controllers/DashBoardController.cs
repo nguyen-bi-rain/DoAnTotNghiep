@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using AuthJWT.Domain.Contracts;
 using AuthJWT.Domain.DTOs;
 using AuthJWT.Domain.Enums;

@@ -5,6 +5,7 @@ using AuthJWT.Domain.Contracts;
 using AuthJWT.Domain.DTOs;
 using AuthJWT.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace AuthJWT.Controllers
 {
@@ -12,11 +13,13 @@ namespace AuthJWT.Controllers
     [Route("api/[controller]")]
     public class HotelController : ControllerBase
     {
+        private readonly IRecommendationService _recommendationService;
         private readonly IHotelService _hotelService;
         private readonly IRatingService _ratingService;
         private readonly IRoomService _roomService;
-        public HotelController(IHotelService hotelService, IRatingService ratingService, IRoomService roomService)
+        public HotelController(IHotelService hotelService, IRatingService ratingService, IRoomService roomService, IRecommendationService recommendationService)
         {
+            _recommendationService = recommendationService;
             _roomService = roomService;
             _hotelService = hotelService;
             _ratingService = ratingService;
@@ -62,7 +65,7 @@ namespace AuthJWT.Controllers
         {
             return await HandleRequestHelper.HandleRequestAsync(async () =>
             {
-                var updatedHotel = await _hotelService.UpdateHotelAsync(hotelDto,files);
+                var updatedHotel = await _hotelService.UpdateHotelAsync(hotelDto, files);
                 return Ok(ApiResponse<HotelUpdateDto>.Success(updatedHotel, "Hotel updated successfully"));
             });
         }
@@ -104,9 +107,19 @@ namespace AuthJWT.Controllers
         {
             return HandleRequestHelper.HandleRequestAsync(async () =>
             {
-
                 var hotels = await _hotelService.SearchAvailableRoom(fromDate, endDate, numberGuest, location, pageIndex, pageSize, sort);
                 return Ok(ApiResponse<PaginateList<HotelResponse>>.Success(hotels));
+            });
+        }
+        [HttpGet("recommendations")]
+        [Authorize]
+        public async Task<IActionResult> GetRecommendedRooms(DateTime fromDate = default, DateTime endDate = default, int numberGuest = 1, string location = null, int page = 1, int pageSize = 10,int sortBy = 0)
+        {
+            return await HandleRequestHelper.HandleRequestAsync(async () =>
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var recommendedRooms = await _recommendationService.GetRecommendedRooms(userId, fromDate, endDate, numberGuest, location, page, pageSize, sortBy);
+                return Ok(ApiResponse<PaginateList<HotelResponse>>.Success(recommendedRooms));
             });
         }
 

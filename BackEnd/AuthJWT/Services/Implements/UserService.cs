@@ -190,6 +190,11 @@ namespace AuthJWT.Services.Implements
             }
             if (!await _userManager.CheckPasswordAsync(user, userRequest.Password)) throw new Exception("Invalid password");
             //generate access token
+            if(user.isActive == false)
+            {
+                _logger.LogInformation("User is not active");
+                throw new Exception("User is not active");
+            }
             var token = await _tokenService.GenerateToken(user);
 
             var refreshToken = _tokenService.GenerateRefreshToken();
@@ -269,7 +274,8 @@ namespace AuthJWT.Services.Implements
                 throw new Exception("User already exists");
             }
             var newUser = _mapper.Map<ApplicationUser>(userRequest);
-            newUser.UserName = $"{userRequest.FirstName}{userRequest.LastName}{Guid.NewGuid()}".Trim();
+            var userName = $"{userRequest.FirstName}{userRequest.LastName}".Replace(" ", "") + Guid.NewGuid().ToString("N")[..8];
+            newUser.UserName = userName;
             var result = await _userManager.CreateAsync(newUser, userRequest.Password);
 
             await _userManager.AddToRoleAsync(newUser, "User");

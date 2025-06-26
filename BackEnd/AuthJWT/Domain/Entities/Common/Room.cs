@@ -28,10 +28,8 @@ public class Room : BaseEntity
     public int NumberOfRooms { get; set; }
     public int AvailableRooms { get; set; }
     public string BedType { get; set; }
-
     [ForeignKey("HotelId")]
     public Hotel Hotel { get; set; }
-
     [ForeignKey("RoomTypeId")]
     public RoomType RoomType { get; set; }
     public virtual ICollection<RoomConvenience> Conveniences { get; set; } = new List<RoomConvenience>();
