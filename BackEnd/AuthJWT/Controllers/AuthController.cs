@@ -9,11 +9,13 @@ namespace AuthJWT.Controllers
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
+        private readonly IAuthService _authService;
         private readonly IUserService _userService;
         private readonly IHotelOwnerService _hotelOwnerService;
 
-        public AuthController(IUserService userService, IHotelOwnerService hotelOwnerService)
+        public AuthController(IAuthService authService, IUserService userService, IHotelOwnerService hotelOwnerService)
         {
+            _authService = authService;
             _userService = userService;
             _hotelOwnerService = hotelOwnerService;
         }
@@ -46,7 +48,7 @@ namespace AuthJWT.Controllers
             var response = await _userService.GetByIdAsync(id);
             return Ok(response);
         }
-        
+
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
         {
@@ -143,6 +145,40 @@ namespace AuthJWT.Controllers
         {
             await _userService.DeleteUserAsync(id);
             return Ok(new { Message = "User deleted successfully" });
+        }
+        [HttpPost("google-login")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GoogleLogin(string returnUrl)
+        {
+            try
+            {
+                await _authService.GoogleLoginAsync(returnUrl);
+                return Ok(new { Message = "Redirecting to Google login" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+        [HttpGet("callback")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GoogleCallback()
+        {
+            try
+            {
+                var user = await _authService.HandleGoogleCallbackAsync();
+                if (user == null)
+                {
+                    return BadRequest("Google authentication failed.");
+                }
+
+                // Here you can generate JWT token or any other logic after successful login
+                return Ok(new { Message = "Google login successful", User = user });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
     }

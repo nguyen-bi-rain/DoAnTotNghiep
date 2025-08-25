@@ -16,5 +16,6 @@ namespace AuthJWT.Services.Interfaces
         Task<PaginateList<UserDto>> GetAllUsersAsync(int pageNumber, int pageSize, string? searchTerm = null);
         Task ChnageStatusAsync(string id, bool status);
         Task DeleteUserAsync(string id);
+        
     }
 }

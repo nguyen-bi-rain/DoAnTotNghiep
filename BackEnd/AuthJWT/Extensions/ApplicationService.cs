@@ -5,6 +5,7 @@ using AuthJWT.Domain.DTOs;
 using AuthJWT.Services.Implements;
 using AuthJWT.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.IdentityModel.Tokens;
 
 
@@ -66,6 +67,13 @@ namespace AuthJWT.Extensions
                         return context.Response.WriteAsync(result);
                     },
                 };
+            }).AddGoogle(option => {
+                option.ClientId = configuration["GoogleAuthentication:Client"];
+                option.ClientSecret = configuration["GoogleAuthentication:ClientSecret"];
+                option.SaveTokens = true;
+                option.Scope.Add("email");
+                option.Scope.Add("profile");
+                
             });
 
         }
